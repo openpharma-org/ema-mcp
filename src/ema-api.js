@@ -48,6 +48,42 @@ async function makeEmaRequest(url) {
 }
 
 /**
+ * Make HTTP request to EMA document endpoints (which return {data: [...]} format)
+ * @param {string} url - API URL to request
+ * @returns {Promise<Array>} Response data array
+ */
+async function makeEmaDocumentRequest(url) {
+  try {
+    const response = await axios.get(url, {
+      timeout: 30000,
+      headers: {
+        'User-Agent': 'EMA-MCP-Server/0.0.1',
+        'Accept': 'application/json'
+      }
+    });
+
+    const json = typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
+
+    // Document endpoints return {data: [...]} format
+    if (json.data && Array.isArray(json.data)) {
+      return json.data;
+    }
+
+    throw new Error('EMA API document response missing data array');
+  } catch (error) {
+    if (error.code === 'ECONNABORTED') {
+      throw new Error('EMA API request timeout (30s exceeded)');
+    } else if (error.response) {
+      throw new Error(`EMA API HTTP error ${error.response.status}: ${error.response.statusText}`);
+    } else if (error.request) {
+      throw new Error('EMA API network error: No response received');
+    } else {
+      throw new Error(`EMA API request failed: ${error.message}`);
+    }
+  }
+}
+
+/**
  * Parse EMA date format (DD Month YYYY) to ISO format (YYYY-MM-DD)
  * @param {string} emaDate - Date in EMA format
  * @returns {string|null} ISO formatted date or null
@@ -429,6 +465,430 @@ async function getPostAuthProcedures(params = {}) {
   };
 }
 
+/**
+ * Get Direct Healthcare Professional Communications (DHPCs)
+ * @param {Object} params - Filter parameters
+ * @returns {Promise<Object>} DHPC data
+ */
+async function getDhpcs(params = {}) {
+  // Validate input parameters
+  if (params.limit && (typeof params.limit !== 'number' || params.limit < 1 || params.limit > 10000)) {
+    throw new Error('limit must be a number between 1 and 10000');
+  }
+
+  if (params.year && (typeof params.year !== 'number' || params.year < 1995 || params.year > new Date().getFullYear() + 1)) {
+    throw new Error(`year must be a number between 1995 and ${new Date().getFullYear() + 1}`);
+  }
+
+  const url = generateEmaUrl('dhpc-output-json-report_en.json');
+  const allDhpcs = await makeEmaRequest(url);
+
+  let results = allDhpcs;
+
+  // Filter by medicine name
+  if (params.medicine_name) {
+    const searchTerm = params.medicine_name.toLowerCase();
+    results = results.filter(d =>
+      d.name_of_medicine && d.name_of_medicine.toLowerCase().includes(searchTerm)
+    );
+  }
+
+  // Filter by active substance
+  if (params.active_substance) {
+    const searchTerm = params.active_substance.toLowerCase();
+    results = results.filter(d =>
+      d.active_substances && d.active_substances.toLowerCase().includes(searchTerm)
+    );
+  }
+
+  // Filter by DHPC type
+  if (params.dhpc_type) {
+    results = results.filter(d =>
+      d.dhpc_type && d.dhpc_type.toLowerCase() === params.dhpc_type.toLowerCase()
+    );
+  }
+
+  // Filter by year (dissemination_date)
+  if (params.year) {
+    results = results.filter(d => {
+      const date = d.dissemination_date;
+      return date && date.includes(params.year.toString());
+    });
+  }
+
+  // Apply limit
+  const limit = params.limit || 50;
+  results = results.slice(0, limit);
+
+  return {
+    total_count: results.length,
+    results: results,
+    source: 'EMA Direct Healthcare Professional Communications',
+    source_url: url,
+    last_updated: new Date().toISOString()
+  };
+}
+
+/**
+ * Get Periodic Safety Update Reports (PSUSAs)
+ * @param {Object} params - Filter parameters
+ * @returns {Promise<Object>} PSUSA data
+ */
+async function getPsusas(params = {}) {
+  // Validate input parameters
+  if (params.limit && (typeof params.limit !== 'number' || params.limit < 1 || params.limit > 10000)) {
+    throw new Error('limit must be a number between 1 and 10000');
+  }
+
+  const url = generateEmaUrl('medicines-output-periodic_safety_update_report_single_assessments-output-json-report_en.json');
+  const allPsusas = await makeEmaRequest(url);
+
+  let results = allPsusas;
+
+  // Filter by active substance
+  if (params.active_substance) {
+    const searchTerm = params.active_substance.toLowerCase();
+    results = results.filter(p =>
+      (p.active_substance && p.active_substance.toLowerCase().includes(searchTerm)) ||
+      (p.active_substances_in_scope_of_procedure && p.active_substances_in_scope_of_procedure.toLowerCase().includes(searchTerm))
+    );
+  }
+
+  // Filter by regulatory outcome
+  if (params.regulatory_outcome) {
+    results = results.filter(p =>
+      p.regulatory_outcome && p.regulatory_outcome.toLowerCase() === params.regulatory_outcome.toLowerCase()
+    );
+  }
+
+  // Apply limit
+  const limit = params.limit || 100;
+  results = results.slice(0, limit);
+
+  return {
+    total_count: results.length,
+    results: results,
+    source: 'EMA Periodic Safety Update Reports',
+    source_url: url,
+    last_updated: new Date().toISOString()
+  };
+}
+
+/**
+ * Get Paediatric Investigation Plans (PIPs)
+ * @param {Object} params - Filter parameters
+ * @returns {Promise<Object>} PIP data
+ */
+async function getPips(params = {}) {
+  // Validate input parameters
+  if (params.limit && (typeof params.limit !== 'number' || params.limit < 1 || params.limit > 10000)) {
+    throw new Error('limit must be a number between 1 and 10000');
+  }
+
+  if (params.year && (typeof params.year !== 'number' || params.year < 1995 || params.year > new Date().getFullYear() + 1)) {
+    throw new Error(`year must be a number between 1995 and ${new Date().getFullYear() + 1}`);
+  }
+
+  const url = generateEmaUrl('medicines-output-paediatric_investigation_plans-output-json-report_en.json');
+  const allPips = await makeEmaRequest(url);
+
+  let results = allPips;
+
+  // Filter by active substance
+  if (params.active_substance) {
+    const searchTerm = params.active_substance.toLowerCase();
+    results = results.filter(p =>
+      p.active_substance && p.active_substance.toLowerCase().includes(searchTerm)
+    );
+  }
+
+  // Filter by therapeutic area
+  if (params.therapeutic_area) {
+    const searchTerm = params.therapeutic_area.toLowerCase();
+    results = results.filter(p =>
+      p.therapeutic_area && p.therapeutic_area.toLowerCase().includes(searchTerm)
+    );
+  }
+
+  // Filter by decision type
+  if (params.decision_type) {
+    const searchTerm = params.decision_type.toLowerCase();
+    results = results.filter(p =>
+      p.decision_type && p.decision_type.toLowerCase().includes(searchTerm)
+    );
+  }
+
+  // Filter by year (decision_date)
+  if (params.year) {
+    results = results.filter(p => {
+      const date = p.decision_date;
+      return date && date.includes(params.year.toString());
+    });
+  }
+
+  // Apply limit
+  const limit = params.limit || 100;
+  results = results.slice(0, limit);
+
+  return {
+    total_count: results.length,
+    results: results,
+    source: 'EMA Paediatric Investigation Plans',
+    source_url: url,
+    last_updated: new Date().toISOString()
+  };
+}
+
+/**
+ * Get Herbal Medicines assessments
+ * NOTE: EMA does not currently publish herbal medicine data as a JSON endpoint.
+ * This method is a placeholder and returns empty results until a valid endpoint is identified.
+ * @param {Object} params - Filter parameters
+ * @returns {Promise<Object>} Herbal medicine data
+ */
+async function getHerbalMedicines(params = {}) {
+  // Validate input parameters
+  if (params.limit && (typeof params.limit !== 'number' || params.limit < 1 || params.limit > 10000)) {
+    throw new Error('limit must be a number between 1 and 10000');
+  }
+
+  // TODO: Find valid EMA herbal medicines JSON endpoint
+  // Returning empty dataset for now
+  const allHerbal = [];
+
+  let results = allHerbal;
+
+  // Filter by herbal substance (if field exists)
+  if (params.substance) {
+    const searchTerm = params.substance.toLowerCase();
+    results = results.filter(h =>
+      (h.herbal_substance && h.herbal_substance.toLowerCase().includes(searchTerm)) ||
+      (h.botanical_name && h.botanical_name.toLowerCase().includes(searchTerm))
+    );
+  }
+
+  // Filter by therapeutic area (if field exists)
+  if (params.therapeutic_area) {
+    const searchTerm = params.therapeutic_area.toLowerCase();
+    results = results.filter(h =>
+      h.therapeutic_area && h.therapeutic_area.toLowerCase().includes(searchTerm)
+    );
+  }
+
+  // Apply limit
+  const limit = params.limit || 50;
+  results = results.slice(0, limit);
+
+  return {
+    total_count: results.length,
+    results: results,
+    source: 'EMA Herbal Medicines (placeholder - no JSON endpoint available)',
+    source_url: 'https://www.ema.europa.eu/en/medicines/download-medicine-data',
+    last_updated: new Date().toISOString()
+  };
+}
+
+/**
+ * Get Medicines for Use Outside EU (Article 58)
+ * NOTE: EMA does not currently publish Article 58 data as a JSON endpoint.
+ * This method is a placeholder and returns empty results until a valid endpoint is identified.
+ * @param {Object} params - Filter parameters
+ * @returns {Promise<Object>} Article 58 medicine data
+ */
+async function getArticle58Medicines(params = {}) {
+  // Validate input parameters
+  if (params.limit && (typeof params.limit !== 'number' || params.limit < 1 || params.limit > 10000)) {
+    throw new Error('limit must be a number between 1 and 10000');
+  }
+
+  // TODO: Find valid EMA Article 58 JSON endpoint
+  // Returning empty dataset for now
+  const allArticle58 = [];
+
+  let results = allArticle58;
+
+  // Filter by active substance (if field exists)
+  if (params.active_substance) {
+    const searchTerm = params.active_substance.toLowerCase();
+    results = results.filter(m =>
+      m.active_substance && m.active_substance.toLowerCase().includes(searchTerm)
+    );
+  }
+
+  // Filter by medicine name (if field exists)
+  if (params.medicine_name) {
+    const searchTerm = params.medicine_name.toLowerCase();
+    results = results.filter(m =>
+      m.medicine_name && m.medicine_name.toLowerCase().includes(searchTerm)
+    );
+  }
+
+  // Apply limit
+  const limit = params.limit || 50;
+  results = results.slice(0, limit);
+
+  return {
+    total_count: results.length,
+    results: results,
+    source: 'EMA Medicines for Use Outside EU - Article 58 (placeholder - no JSON endpoint available)',
+    source_url: 'https://www.ema.europa.eu/en/medicines/download-medicine-data',
+    last_updated: new Date().toISOString()
+  };
+}
+
+/**
+ * Search EPAR Documents
+ * @param {Object} params - Search parameters
+ * @returns {Promise<Object>} EPAR document data
+ */
+async function searchEparDocuments(params = {}) {
+  // Validate input parameters
+  if (params.limit && (typeof params.limit !== 'number' || params.limit < 1 || params.limit > 10000)) {
+    throw new Error('limit must be a number between 1 and 10000');
+  }
+
+  const url = generateEmaUrl('documents-output-epar_documents_json-report_en.json');
+  const allDocuments = await makeEmaDocumentRequest(url);
+
+  let results = allDocuments;
+
+  // Filter by medicine name (if field exists)
+  if (params.medicine_name) {
+    const searchTerm = params.medicine_name.toLowerCase();
+    results = results.filter(d =>
+      d.medicine_name && d.medicine_name.toLowerCase().includes(searchTerm)
+    );
+  }
+
+  // Filter by document type (if field exists)
+  if (params.document_type) {
+    const searchTerm = params.document_type.toLowerCase();
+    results = results.filter(d =>
+      d.document_type && d.document_type.toLowerCase().includes(searchTerm)
+    );
+  }
+
+  // Filter by language (if field exists)
+  if (params.language) {
+    const searchTerm = params.language.toLowerCase();
+    results = results.filter(d =>
+      d.language && d.language.toLowerCase() === searchTerm
+    );
+  }
+
+  // Apply limit
+  const limit = params.limit || 100;
+  results = results.slice(0, limit);
+
+  return {
+    total_count: results.length,
+    results: results,
+    source: 'EMA EPAR Documents',
+    source_url: url,
+    last_updated: new Date().toISOString()
+  };
+}
+
+/**
+ * Search All EMA Documents
+ * @param {Object} params - Search parameters
+ * @returns {Promise<Object>} All document data
+ */
+async function searchAllDocuments(params = {}) {
+  // Validate input parameters
+  if (params.limit && (typeof params.limit !== 'number' || params.limit < 1 || params.limit > 10000)) {
+    throw new Error('limit must be a number between 1 and 10000');
+  }
+
+  const url = generateEmaUrl('documents-output-json-report_en.json');
+  const allDocuments = await makeEmaDocumentRequest(url);
+
+  let results = allDocuments;
+
+  // Filter by search term in title (if field exists)
+  if (params.search_term) {
+    const searchTerm = params.search_term.toLowerCase();
+    results = results.filter(d =>
+      (d.title && d.title.toLowerCase().includes(searchTerm)) ||
+      (d.document_title && d.document_title.toLowerCase().includes(searchTerm))
+    );
+  }
+
+  // Filter by document type (if field exists)
+  if (params.document_type) {
+    const searchTerm = params.document_type.toLowerCase();
+    results = results.filter(d =>
+      d.document_type && d.document_type.toLowerCase().includes(searchTerm)
+    );
+  }
+
+  // Filter by category (if field exists)
+  if (params.category) {
+    const searchTerm = params.category.toLowerCase();
+    results = results.filter(d =>
+      d.category && d.category.toLowerCase().includes(searchTerm)
+    );
+  }
+
+  // Apply limit
+  const limit = params.limit || 100;
+  results = results.slice(0, limit);
+
+  return {
+    total_count: results.length,
+    results: results,
+    source: 'EMA All Documents',
+    source_url: url,
+    last_updated: new Date().toISOString()
+  };
+}
+
+/**
+ * Search Non-EPAR Documents
+ * @param {Object} params - Search parameters
+ * @returns {Promise<Object>} Non-EPAR document data
+ */
+async function searchNonEparDocuments(params = {}) {
+  // Validate input parameters
+  if (params.limit && (typeof params.limit !== 'number' || params.limit < 1 || params.limit > 10000)) {
+    throw new Error('limit must be a number between 1 and 10000');
+  }
+
+  const url = generateEmaUrl('documents-output-non_epar_documents_json-report_en.json');
+  const allDocuments = await makeEmaDocumentRequest(url);
+
+  let results = allDocuments;
+
+  // Filter by search term (if field exists)
+  if (params.search_term) {
+    const searchTerm = params.search_term.toLowerCase();
+    results = results.filter(d =>
+      (d.title && d.title.toLowerCase().includes(searchTerm)) ||
+      (d.document_title && d.document_title.toLowerCase().includes(searchTerm))
+    );
+  }
+
+  // Filter by document type (if field exists)
+  if (params.document_type) {
+    const searchTerm = params.document_type.toLowerCase();
+    results = results.filter(d =>
+      d.document_type && d.document_type.toLowerCase().includes(searchTerm)
+    );
+  }
+
+  // Apply limit
+  const limit = params.limit || 100;
+  results = results.slice(0, limit);
+
+  return {
+    total_count: results.length,
+    results: results,
+    source: 'EMA Non-EPAR Documents',
+    source_url: url,
+    last_updated: new Date().toISOString()
+  };
+}
+
 module.exports = {
   searchMedicines,
   getMedicineByName,
@@ -436,5 +896,13 @@ module.exports = {
   getSupplyShortages,
   getReferrals,
   getPostAuthProcedures,
+  getDhpcs,
+  getPsusas,
+  getPips,
+  getHerbalMedicines,
+  getArticle58Medicines,
+  searchEparDocuments,
+  searchAllDocuments,
+  searchNonEparDocuments,
   parseEmaDate
 };

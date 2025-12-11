@@ -12,7 +12,15 @@ const {
   getOrphanDesignations,
   getSupplyShortages,
   getReferrals,
-  getPostAuthProcedures
+  getPostAuthProcedures,
+  getDhpcs,
+  getPsusas,
+  getPips,
+  getHerbalMedicines,
+  getArticle58Medicines,
+  searchEparDocuments,
+  searchAllDocuments,
+  searchNonEparDocuments
 } = require('./ema-api.js');
 
 const server = new Server(
@@ -39,9 +47,9 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           properties: {
             method: {
               type: 'string',
-              enum: ['search_medicines', 'get_medicine_by_name', 'get_orphan_designations', 'get_supply_shortages', 'get_referrals', 'get_post_auth_procedures'],
-              description: 'The operation to perform: search_medicines (search EU approved drugs), get_medicine_by_name (get specific medicine), get_orphan_designations (EU orphan drugs), get_supply_shortages (medicine shortages), get_referrals (EU safety reviews), get_post_auth_procedures (label updates)',
-              examples: ['search_medicines', 'get_orphan_designations']
+              enum: ['search_medicines', 'get_medicine_by_name', 'get_orphan_designations', 'get_supply_shortages', 'get_referrals', 'get_post_auth_procedures', 'get_dhpcs', 'get_psusas', 'get_pips', 'get_herbal_medicines', 'get_article58_medicines', 'search_epar_documents', 'search_all_documents', 'search_non_epar_documents'],
+              description: 'The operation to perform: search_medicines (search EU approved drugs), get_medicine_by_name (get specific medicine), get_orphan_designations (EU orphan drugs), get_supply_shortages (medicine shortages), get_referrals (EU safety reviews), get_post_auth_procedures (label updates), get_dhpcs (safety communications), get_psusas (periodic safety reports), get_pips (paediatric plans), get_herbal_medicines (herbal assessments), get_article58_medicines (non-EU use), search_epar_documents (EPAR docs), search_all_documents (all EMA docs), search_non_epar_documents (non-EPAR docs)',
+              examples: ['search_medicines', 'get_dhpcs', 'search_epar_documents']
             },
             // Parameters for search_medicines
             active_substance: {
@@ -196,6 +204,102 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case 'get_post_auth_procedures': {
         const results = await getPostAuthProcedures(params);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(results, null, 2)
+            }
+          ]
+        };
+      }
+
+      case 'get_dhpcs': {
+        const results = await getDhpcs(params);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(results, null, 2)
+            }
+          ]
+        };
+      }
+
+      case 'get_psusas': {
+        const results = await getPsusas(params);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(results, null, 2)
+            }
+          ]
+        };
+      }
+
+      case 'get_pips': {
+        const results = await getPips(params);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(results, null, 2)
+            }
+          ]
+        };
+      }
+
+      case 'get_herbal_medicines': {
+        const results = await getHerbalMedicines(params);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(results, null, 2)
+            }
+          ]
+        };
+      }
+
+      case 'get_article58_medicines': {
+        const results = await getArticle58Medicines(params);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(results, null, 2)
+            }
+          ]
+        };
+      }
+
+      case 'search_epar_documents': {
+        const results = await searchEparDocuments(params);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(results, null, 2)
+            }
+          ]
+        };
+      }
+
+      case 'search_all_documents': {
+        const results = await searchAllDocuments(params);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(results, null, 2)
+            }
+          ]
+        };
+      }
+
+      case 'search_non_epar_documents': {
+        const results = await searchNonEparDocuments(params);
         return {
           content: [
             {
