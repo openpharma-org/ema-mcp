@@ -1,0 +1,238 @@
+#!/usr/bin/env node
+
+const { Server } = require('@modelcontextprotocol/sdk/server/index.js');
+const { StdioServerTransport } = require('@modelcontextprotocol/sdk/server/stdio.js');
+const {
+  CallToolRequestSchema,
+  ListToolsRequestSchema,
+} = require('@modelcontextprotocol/sdk/types.js');
+const {
+  searchMedicines,
+  getMedicineByName,
+  getOrphanDesignations,
+  getSupplyShortages,
+  getReferrals,
+  getPostAuthProcedures
+} = require('./ema-api.js');
+
+const server = new Server(
+  {
+    name: 'ema-mcp-server',
+    version: '0.0.1',
+  },
+  {
+    capabilities: {
+      tools: {},
+    },
+  }
+);
+
+// List available tools
+server.setRequestHandler(ListToolsRequestSchema, async () => {
+  return {
+    tools: [
+      {
+        name: 'ema_info',
+        description: 'Unified tool for EMA (European Medicines Agency) drug information lookup. Provides access to EU drug approvals, EPARs, orphan designations, supply shortages, and regulatory information through EMA\'s public JSON API.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            method: {
+              type: 'string',
+              enum: ['search_medicines', 'get_medicine_by_name', 'get_orphan_designations', 'get_supply_shortages', 'get_referrals', 'get_post_auth_procedures'],
+              description: 'The operation to perform: search_medicines (search EU approved drugs), get_medicine_by_name (get specific medicine), get_orphan_designations (EU orphan drugs), get_supply_shortages (medicine shortages), get_referrals (EU safety reviews), get_post_auth_procedures (label updates)',
+              examples: ['search_medicines', 'get_orphan_designations']
+            },
+            // Parameters for search_medicines
+            active_substance: {
+              type: 'string',
+              description: 'For search_medicines, get_supply_shortages: Active substance name (e.g., "semaglutide", "adalimumab")',
+              examples: ['semaglutide', 'adalimumab', 'pembrolizumab']
+            },
+            therapeutic_area: {
+              type: 'string',
+              description: 'For search_medicines, get_orphan_designations: Therapeutic area or disease (e.g., "diabetes", "cancer", "multiple sclerosis")',
+              examples: ['diabetes', 'cancer', 'multiple sclerosis', 'obesity']
+            },
+            status: {
+              type: 'string',
+              description: 'For search_medicines: Medicine status filter. For get_supply_shortages: "ongoing" or "resolved"',
+              examples: ['Authorised', 'Withdrawn', 'Refused', 'ongoing', 'resolved']
+            },
+            orphan: {
+              type: 'boolean',
+              description: 'For search_medicines: Filter for orphan medicines only',
+              examples: [true, false]
+            },
+            prime: {
+              type: 'boolean',
+              description: 'For search_medicines: Filter for PRIME (priority) medicines only',
+              examples: [true, false]
+            },
+            biosimilar: {
+              type: 'boolean',
+              description: 'For search_medicines: Filter for biosimilar medicines only',
+              examples: [true, false]
+            },
+            conditional_approval: {
+              type: 'boolean',
+              description: 'For search_medicines: Filter for conditionally approved medicines',
+              examples: [true, false]
+            },
+            limit: {
+              type: 'integer',
+              description: 'Maximum number of results to return (default: 100 for medicines, 50 for other methods)',
+              examples: [10, 50, 100]
+            },
+            // Parameter for get_medicine_by_name
+            name: {
+              type: 'string',
+              description: 'For get_medicine_by_name: Medicine trade name to search (e.g., "Ozempic", "Wegovy", "Humira")',
+              examples: ['Ozempic', 'Wegovy', 'Humira', 'Keytruda']
+            },
+            // Parameter for get_orphan_designations, get_referrals
+            year: {
+              type: 'integer',
+              description: 'For get_orphan_designations, get_referrals: Filter by year (e.g., 2024, 2023)',
+              examples: [2024, 2023, 2022]
+            },
+            // Parameter for get_referrals
+            safety: {
+              type: 'boolean',
+              description: 'For get_referrals: Filter for safety-related referrals only',
+              examples: [true, false]
+            },
+            // Parameter for get_post_auth_procedures
+            medicine_name: {
+              type: 'string',
+              description: 'For get_post_auth_procedures: Medicine name to filter procedures',
+              examples: ['Ozempic', 'Keytruda']
+            }
+          },
+          required: ['method'],
+          additionalProperties: false
+        }
+      }
+    ]
+  };
+});
+
+// Handle tool calls
+server.setRequestHandler(CallToolRequestSchema, async (request) => {
+  const { name, arguments: args } = request.params;
+
+  if (name !== 'ema_info') {
+    throw new Error(`Unknown tool: ${name}`);
+  }
+
+  try {
+    const { method, ...params } = args;
+
+    switch (method) {
+      case 'search_medicines': {
+        const results = await searchMedicines(params);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(results, null, 2)
+            }
+          ]
+        };
+      }
+
+      case 'get_medicine_by_name': {
+        const { name } = params;
+        if (!name) {
+          throw new Error('name parameter is required for get_medicine_by_name');
+        }
+
+        const results = await getMedicineByName(name);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(results, null, 2)
+            }
+          ]
+        };
+      }
+
+      case 'get_orphan_designations': {
+        const results = await getOrphanDesignations(params);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(results, null, 2)
+            }
+          ]
+        };
+      }
+
+      case 'get_supply_shortages': {
+        const results = await getSupplyShortages(params);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(results, null, 2)
+            }
+          ]
+        };
+      }
+
+      case 'get_referrals': {
+        const results = await getReferrals(params);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(results, null, 2)
+            }
+          ]
+        };
+      }
+
+      case 'get_post_auth_procedures': {
+        const results = await getPostAuthProcedures(params);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(results, null, 2)
+            }
+          ]
+        };
+      }
+
+      default:
+        throw new Error(`Unknown method: ${method}`);
+    }
+  } catch (error) {
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify({
+            error: error.message,
+            source: 'EMA MCP Server'
+          }, null, 2)
+        }
+      ],
+      isError: true
+    };
+  }
+});
+
+// Start the server
+async function main() {
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+  console.error('EMA MCP Server running on stdio');
+}
+
+main().catch((error) => {
+  console.error('Server error:', error);
+  process.exit(1);
+});

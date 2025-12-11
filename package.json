@@ -1,0 +1,50 @@
+{
+  "name": "@openpharma-org/ema-mcp-server",
+  "version": "0.0.1",
+  "description": "MCP server for EMA (European Medicines Agency) drug information. Provides access to EPAR data, EU drug approvals, orphan designations, and regulatory information through EMA's public JSON API.",
+  "main": "src/index.js",
+  "bin": {
+    "ema-mcp-server": "src/index.js"
+  },
+  "files": [
+    "src/",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node src/index.js",
+    "build": "mkdir -p dist && cp -r src/* dist/",
+    "prebuild": "rm -rf dist"
+  },
+  "keywords": [
+    "mcp",
+    "mcp-server",
+    "ema",
+    "european-medicines-agency",
+    "epar",
+    "drug",
+    "medication",
+    "pharmaceutical",
+    "regulatory",
+    "eu-approval",
+    "orphan-drugs",
+    "healthcare",
+    "model-context-protocol"
+  ],
+  "author": "OpenPharma Contributors",
+  "license": "MIT",
+  "type": "commonjs",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/openpharma-org/ema-mcp-server"
+  },
+  "homepage": "https://github.com/openpharma-org/ema-mcp-server",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.15.0",
+    "axios": "^1.10.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
