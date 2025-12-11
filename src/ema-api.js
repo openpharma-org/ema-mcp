@@ -26,9 +26,24 @@ async function makeEmaRequest(url) {
       }
     });
 
-    return typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
+    const data = typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
+
+    // Validate response is an array
+    if (!Array.isArray(data)) {
+      throw new Error('EMA API returned non-array response');
+    }
+
+    return data;
   } catch (error) {
-    throw new Error(`EMA API request failed: ${error.message}`);
+    if (error.code === 'ECONNABORTED') {
+      throw new Error('EMA API request timeout (30s exceeded)');
+    } else if (error.response) {
+      throw new Error(`EMA API HTTP error ${error.response.status}: ${error.response.statusText}`);
+    } else if (error.request) {
+      throw new Error('EMA API network error: No response received');
+    } else {
+      throw new Error(`EMA API request failed: ${error.message}`);
+    }
   }
 }
 
@@ -66,6 +81,15 @@ function parseEmaDate(emaDate) {
  * @returns {Promise<Object>} Search results with medicines data
  */
 async function searchMedicines(params = {}) {
+  // Validate input parameters
+  if (params.limit && (typeof params.limit !== 'number' || params.limit < 1 || params.limit > 10000)) {
+    throw new Error('limit must be a number between 1 and 10000');
+  }
+
+  if (params.status && !['Authorised', 'Withdrawn', 'Refused', 'Suspended'].includes(params.status)) {
+    throw new Error('status must be one of: Authorised, Withdrawn, Refused, Suspended');
+  }
+
   const url = generateEmaUrl('medicines-output-medicines_json-report_en.json');
   const allMedicines = await makeEmaRequest(url);
 
@@ -129,10 +153,15 @@ async function searchMedicines(params = {}) {
  * @returns {Promise<Object>} Medicine data or null
  */
 async function getMedicineByName(name) {
+  // Validate input
+  if (!name || typeof name !== 'string' || name.trim().length === 0) {
+    throw new Error('name parameter is required and must be a non-empty string');
+  }
+
   const url = generateEmaUrl('medicines-output-medicines_json-report_en.json');
   const allMedicines = await makeEmaRequest(url);
 
-  const searchTerm = name.toLowerCase();
+  const searchTerm = name.trim().toLowerCase();
   const medicine = allMedicines.find(m =>
     m.name_of_medicine && m.name_of_medicine.toLowerCase().includes(searchTerm)
   );
@@ -161,26 +190,53 @@ async function getMedicineByName(name) {
  * @returns {Promise<Object>} Orphan designations data
  */
 async function getOrphanDesignations(params = {}) {
+  // Validate input parameters
+  if (params.limit && (typeof params.limit !== 'number' || params.limit < 1 || params.limit > 10000)) {
+    throw new Error('limit must be a number between 1 and 10000');
+  }
+
+  if (params.year && (typeof params.year !== 'number' || params.year < 1995 || params.year > new Date().getFullYear() + 1)) {
+    throw new Error(`year must be a number between 1995 and ${new Date().getFullYear() + 1}`);
+  }
+
+  if (params.status && !['Positive', 'Negative', 'Withdrawn'].includes(params.status)) {
+    throw new Error('status must be one of: Positive, Negative, Withdrawn');
+  }
+
   const url = generateEmaUrl('medicines-output-orphan_designations-json-report_en.json');
   const allDesignations = await makeEmaRequest(url);
 
   let results = allDesignations;
 
-  // Filter by therapeutic area if provided
+  // Filter by therapeutic area (searches in intended_use field)
   if (params.therapeutic_area) {
     const searchTerm = params.therapeutic_area.toLowerCase();
     results = results.filter(d =>
-      (d.therapeutic_area && d.therapeutic_area.toLowerCase().includes(searchTerm)) ||
-      (d.orphan_condition && d.orphan_condition.toLowerCase().includes(searchTerm))
+      d.intended_use && d.intended_use.toLowerCase().includes(searchTerm)
     );
   }
 
-  // Filter by year if provided
+  // Filter by active substance if provided
+  if (params.active_substance) {
+    const searchTerm = params.active_substance.toLowerCase();
+    results = results.filter(d =>
+      d.active_substance && d.active_substance.toLowerCase().includes(searchTerm)
+    );
+  }
+
+  // Filter by year if provided (searches in date_of_designation_or_refusal)
   if (params.year) {
     results = results.filter(d => {
-      const date = d.date_of_designation;
+      const date = d.date_of_designation_or_refusal;
       return date && date.includes(params.year.toString());
     });
+  }
+
+  // Filter by status if provided
+  if (params.status) {
+    results = results.filter(d =>
+      d.status && d.status.toLowerCase() === params.status.toLowerCase()
+    );
   }
 
   // Apply limit
@@ -202,27 +258,52 @@ async function getOrphanDesignations(params = {}) {
  * @returns {Promise<Object>} Shortage data
  */
 async function getSupplyShortages(params = {}) {
+  // Validate input parameters
+  if (params.limit && (typeof params.limit !== 'number' || params.limit < 1 || params.limit > 10000)) {
+    throw new Error('limit must be a number between 1 and 10000');
+  }
+
+  if (params.status && !['Ongoing', 'Resolved', 'ongoing', 'resolved'].includes(params.status)) {
+    throw new Error('status must be one of: Ongoing, Resolved (case-insensitive)');
+  }
+
   const url = generateEmaUrl('shortages-output-json-report_en.json');
   const allShortages = await makeEmaRequest(url);
 
   let results = allShortages;
 
-  // Filter by active substance if provided
+  // Filter by active substance (uses international_non_proprietary_name_inn_or_common_name field)
   if (params.active_substance) {
     const searchTerm = params.active_substance.toLowerCase();
     results = results.filter(s =>
-      s.active_substance && s.active_substance.toLowerCase().includes(searchTerm)
+      (s.international_non_proprietary_name_inn_or_common_name &&
+       s.international_non_proprietary_name_inn_or_common_name.toLowerCase().includes(searchTerm)) ||
+      (s.medicine_affected && s.medicine_affected.toLowerCase().includes(searchTerm))
     );
   }
 
-  // Filter by status (ongoing/resolved)
+  // Filter by medicine name if provided
+  if (params.medicine_name) {
+    const searchTerm = params.medicine_name.toLowerCase();
+    results = results.filter(s =>
+      s.medicine_affected && s.medicine_affected.toLowerCase().includes(searchTerm)
+    );
+  }
+
+  // Filter by therapeutic area if provided
+  if (params.therapeutic_area) {
+    const searchTerm = params.therapeutic_area.toLowerCase();
+    results = results.filter(s =>
+      s.therapeutic_area_mesh && s.therapeutic_area_mesh.toLowerCase().includes(searchTerm)
+    );
+  }
+
+  // Filter by status (uses supply_shortage_status field: "Ongoing" or "Resolved")
   if (params.status) {
-    const isOngoing = params.status === 'ongoing';
-    results = results.filter(s => {
-      // If has end date, it's resolved; otherwise ongoing
-      const hasEndDate = s.end_date && s.end_date !== '';
-      return isOngoing ? !hasEndDate : hasEndDate;
-    });
+    results = results.filter(s =>
+      s.supply_shortage_status &&
+      s.supply_shortage_status.toLowerCase() === params.status.toLowerCase()
+    );
   }
 
   // Apply limit
@@ -244,23 +325,56 @@ async function getSupplyShortages(params = {}) {
  * @returns {Promise<Object>} Referrals data
  */
 async function getReferrals(params = {}) {
+  // Validate input parameters
+  if (params.limit && (typeof params.limit !== 'number' || params.limit < 1 || params.limit > 10000)) {
+    throw new Error('limit must be a number between 1 and 10000');
+  }
+
+  if (params.safety !== undefined && typeof params.safety !== 'boolean') {
+    throw new Error('safety parameter must be a boolean (true or false)');
+  }
+
+  if (params.year && (typeof params.year !== 'number' || params.year < 1995 || params.year > new Date().getFullYear() + 1)) {
+    throw new Error(`year must be a number between 1995 and ${new Date().getFullYear() + 1}`);
+  }
+
   const url = generateEmaUrl('referrals-output-json-report_en.json');
   const allReferrals = await makeEmaRequest(url);
 
   let results = allReferrals;
 
-  // Filter by safety-related if specified
+  // Filter by safety-related if specified (uses safety_referral field: "Sì" or "No")
   if (params.safety === true) {
     results = results.filter(r =>
-      (r.referral_type && r.referral_type.toLowerCase().includes('safety')) ||
-      (r.grounds && r.grounds.toLowerCase().includes('safety'))
+      r.safety_referral === 'Sì' || r.safety_referral === 'Yes'
+    );
+  } else if (params.safety === false) {
+    results = results.filter(r =>
+      r.safety_referral === 'No'
     );
   }
 
-  // Filter by year if provided
+  // Filter by active substance if provided
+  if (params.active_substance) {
+    const searchTerm = params.active_substance.toLowerCase();
+    results = results.filter(r =>
+      r.international_non_proprietary_name_inn_common_name &&
+      r.international_non_proprietary_name_inn_common_name.toLowerCase().includes(searchTerm)
+    );
+  }
+
+  // Filter by status if provided
+  if (params.status) {
+    const searchTerm = params.status.toLowerCase();
+    results = results.filter(r =>
+      r.current_status && r.current_status.toLowerCase().includes(searchTerm)
+    );
+  }
+
+  // Filter by year if provided (uses procedure_start_date field)
   if (params.year) {
     results = results.filter(r => {
-      const startDate = r.start_date;
+      const startDate = r.procedure_start_date;
       return startDate && startDate.includes(params.year.toString());
     });
   }
@@ -284,6 +398,11 @@ async function getReferrals(params = {}) {
  * @returns {Promise<Object>} Post-auth procedures data
  */
 async function getPostAuthProcedures(params = {}) {
+  // Validate input parameters
+  if (params.limit && (typeof params.limit !== 'number' || params.limit < 1 || params.limit > 10000)) {
+    throw new Error('limit must be a number between 1 and 10000');
+  }
+
   const url = generateEmaUrl('medicines-output-post_authorisation_json-report_en.json');
   const allProcedures = await makeEmaRequest(url);
 

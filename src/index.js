@@ -90,23 +90,23 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               description: 'For get_medicine_by_name: Medicine trade name to search (e.g., "Ozempic", "Wegovy", "Humira")',
               examples: ['Ozempic', 'Wegovy', 'Humira', 'Keytruda']
             },
-            // Parameter for get_orphan_designations, get_referrals
+            // Parameters for get_orphan_designations
             year: {
               type: 'integer',
               description: 'For get_orphan_designations, get_referrals: Filter by year (e.g., 2024, 2023)',
               examples: [2024, 2023, 2022]
             },
-            // Parameter for get_referrals
+            // Parameters for get_referrals
             safety: {
               type: 'boolean',
-              description: 'For get_referrals: Filter for safety-related referrals only',
+              description: 'For get_referrals: Filter for safety-related referrals (true=Yes, false=No)',
               examples: [true, false]
             },
-            // Parameter for get_post_auth_procedures
+            // Parameters for get_supply_shortages and get_post_auth_procedures
             medicine_name: {
               type: 'string',
-              description: 'For get_post_auth_procedures: Medicine name to filter procedures',
-              examples: ['Ozempic', 'Keytruda']
+              description: 'For get_supply_shortages, get_post_auth_procedures: Medicine name to filter',
+              examples: ['Ozempic', 'Keytruda', 'Insulin lispro']
             }
           },
           required: ['method'],
