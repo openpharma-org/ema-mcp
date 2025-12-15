@@ -1,4 +1,4 @@
-# EMA MCP Server
+# Unofficial EMA MCP Server
 
 A Model Context Protocol (MCP) server providing access to the European Medicines Agency (EMA) public JSON API for regulatory intelligence and pharmaceutical research.
 
@@ -17,17 +17,7 @@ This MCP server complements FDA data sources by providing comprehensive access t
 - ✅ Comprehensive input validation and error handling
 - ✅ 100% test coverage (68 tests passing)
 
-## Installation
-
-```bash
-npm install
-```
-
 ## Usage
-
-### As MCP Server
-
-Add to your MCP configuration (e.g., `.mcp.json`):
 
 ```json
 {
@@ -41,53 +31,7 @@ Add to your MCP configuration (e.g., `.mcp.json`):
 }
 ```
 
-### Direct API Usage
-
-```javascript
-const api = require('./src/ema-api.js');
-
-// Search medicines
-const semaglutide = await api.searchMedicines({
-  active_substance: 'semaglutide',
-  status: 'Authorised'
-});
-
-// Get specific medicine
-const ozempic = await api.getMedicineByName('Ozempic');
-
-// Get orphan designations
-const cancerOrphans = await api.getOrphanDesignations({
-  therapeutic_area: 'cancer',
-  year: 2024
-});
-
-// Get supply shortages
-const ongoingShortages = await api.getSupplyShortages({
-  status: 'Ongoing'
-});
-
-// Get safety referrals
-const safetyReviews = await api.getReferrals({
-  safety: true
-});
-```
-
 ## API Reference
-
-### Single Tool: `ema_info`
-
-All functionality is accessed through one unified tool with a `method` parameter:
-
-```json
-{
-  "name": "ema_info",
-  "arguments": {
-    "method": "search_medicines",
-    "active_substance": "semaglutide",
-    "status": "Authorised"
-  }
-}
-```
 
 ### Methods
 
@@ -453,24 +397,6 @@ The server accesses 14 EMA JSON endpoints organized into 4 categories:
 **Update Schedule**: Twice daily (06:00 and 18:00 CET)
 **Document Format**: Document endpoints return `{data: [...]}` format, others return `[...]` array format
 
-## Medicine Record Schema
-
-Each medicine record contains 39 fields including:
-
-- `name_of_medicine`: Trade name
-- `active_substance`: INN/common name
-- `ema_product_number`: Unique identifier (e.g., "EMEA/H/C/004174")
-- `therapeutic_area_mesh`: MeSH therapeutic areas
-- `therapeutic_indication`: Approved indications
-- `medicine_status`: Authorised, Withdrawn, Refused, Suspended
-- `authorisation_date`: DD Month YYYY format
-- `orphan_medicine`: Yes/No
-- `biosimilar`: Yes/No
-- `conditional_approval`: Yes/No
-- `prime_priority_medicine`: Yes/No
-- `marketing_authorisation_holder`: Company name
-- And 27 more fields...
-
 ## EMA ↔ FDA Terminology Mapping
 
 | EMA Term | FDA Equivalent |
@@ -483,90 +409,3 @@ Each medicine record contains 39 fields including:
 | Referral | Safety Review |
 | Marketing Authorisation Holder | Sponsor/Applicant |
 | Medicinal Product | Drug Product |
-
-## Error Handling
-
-The server includes comprehensive error handling:
-
-- **Input Validation**: All parameters validated before API calls
-- **Network Errors**: Timeout (30s), connection failures, HTTP errors
-- **Data Validation**: Response format validation
-- **Informative Errors**: Clear error messages with context
-
-**Example Error**:
-```json
-{
-  "error": "limit must be a number between 1 and 10000",
-  "source": "EMA MCP Server"
-}
-```
-
-## Testing
-
-Run the comprehensive test suite:
-
-```bash
-node test.js
-```
-
-**Coverage**:
-- 16 test suites
-- 68 individual assertions
-- 100% success rate
-- Tests all 14 methods, edge cases, validation, and response formats
-
-**Test Results**:
-```
-Test Suite 1: search_medicines ✓
-Test Suite 2: get_medicine_by_name ✓
-Test Suite 3: get_orphan_designations ✓
-Test Suite 4: get_supply_shortages ✓
-Test Suite 5: get_referrals ✓
-Test Suite 6: get_post_auth_procedures ✓
-Test Suite 7: Response Format Validation ✓
-Test Suite 8: Edge Cases ✓
-Test Suite 9: get_dhpcs ✓
-Test Suite 10: get_psusas ✓
-Test Suite 11: get_pips ✓
-Test Suite 12: get_herbal_medicines ✓ (placeholder)
-Test Suite 13: get_article58_medicines ✓ (placeholder)
-Test Suite 14: search_epar_documents ✓
-Test Suite 15: search_all_documents ✓
-Test Suite 16: search_non_epar_documents ✓
-```
-
-## Implementation Notes
-
-### Field Mapping Corrections
-
-Based on actual EMA JSON inspection, the following field mappings were corrected:
-
-1. **Orphan Designations**: Uses `intended_use` (not `therapeutic_area`) for condition description
-2. **Supply Shortages**: Uses `international_non_proprietary_name_inn_or_common_name` and `medicine_affected` (not `active_substance`)
-3. **Referrals**: `safety_referral` field uses "Sì" (Italian) instead of "Yes"
-4. **Medicines**: `orphan_medicine` and `biosimilar` flags not consistently set in main database (use separate endpoints)
-
-### Design Decisions
-
-1. **Single Tool Pattern**: Following MCP best practices, all functionality exposed through one `ema_info` tool with `method` parameter
-2. **CommonJS**: Uses `require()` syntax (like WHO MCP) instead of TypeScript (simpler, fewer dependencies)
-3. **No Authentication**: EMA API is fully public, no API keys needed
-4. **Conservative Defaults**: Reasonable limits (100 medicines, 50 other endpoints) to avoid overwhelming responses
-5. **Case-Insensitive Filtering**: All text searches are case-insensitive for better UX
-
-## License
-
-MIT License - Copyright (c) 2025 OpenPharma Contributors
-
-## Contributing
-
-This server is part of the OpenPharma organization's pharmaceutical intelligence platform.
-
-## Related Projects
-
-- **fda-mcp-server**: FDA drug labels, adverse events, recalls
-- **ct-gov-mcp-server**: ClinicalTrials.gov data
-- **pubmed-mcp-server**: PubMed biomedical literature
-- **who-mcp-server**: WHO global health statistics
-
-Together these servers provide comprehensive pharmaceutical research intelligence covering regulatory, clinical, safety, and scientific data sources.
