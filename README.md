@@ -28,6 +28,7 @@ This MCP server complements FDA data sources by providing comprehensive access t
     }
   }
 }
+```
 
 ## API Reference
 
