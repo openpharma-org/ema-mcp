@@ -1,5 +1,26 @@
+# Dependencies
 node_modules/
-dist/
+
+# Build output
+build/
+
+# Logs
 *.log
-.DS_Store
+npm-debug.log*
+
+# dotenv environment variables file
 .env
+.env.local
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Output of 'npm pack'
+*.tgz

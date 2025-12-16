@@ -15,7 +15,6 @@ This MCP server complements FDA data sources by providing comprehensive access t
 - ✅ No authentication required (public API)
 - ✅ Updated twice daily (06:00 and 18:00 CET)
 - ✅ Comprehensive input validation and error handling
-- ✅ 100% test coverage (68 tests passing)
 
 ## Usage
 
@@ -24,12 +23,11 @@ This MCP server complements FDA data sources by providing comprehensive access t
   "mcpServers": {
     "ema-mcp-server": {
       "command": "node",
-      "args": ["/path/to/ema-mcp-server/src/index.js"],
+      "args": ["/path/to/ema-mcp-server/build/index.js"],
       "env": {}
     }
   }
 }
-```
 
 ## API Reference
 
