@@ -7,14 +7,11 @@ A Model Context Protocol (MCP) server providing access to the European Medicines
 This MCP server complements FDA data sources by providing comprehensive access to EU drug approvals, EPARs (European Public Assessment Reports), orphan designations, supply shortages, safety reviews, and regulatory procedures. Together with FDA coverage, this provides ~70% global pharmaceutical market regulatory intelligence.
 
 **Key Features**:
-- ✅ Single unified `ema_info` tool with method parameter (MCP best practice)
-- ✅ 14 comprehensive methods covering medicines, safety, documents, and pediatrics
-- ✅ 2,641+ EU-approved medicines with 39 fields each
-- ✅ Real-time orphan designations, supply shortages, and safety data
-- ✅ Document search (EPAR, all EMA documents, non-EPAR documents)
-- ✅ No authentication required (public API)
-- ✅ Updated twice daily (06:00 and 18:00 CET)
-- ✅ Comprehensive input validation and error handling
+- Single unified `ema_info` tool with method parameter (MCP best practice)
+- 14 comprehensive methods covering medicines, safety, documents, and pediatrics
+- 2,641+ EU-approved medicines with 39 fields each
+- Real-time orphan designations, supply shortages, and safety data
+- Document search (EPAR, all EMA documents, non-EPAR documents)
 
 ## Usage
 
